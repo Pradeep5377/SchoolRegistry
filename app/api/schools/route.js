@@ -1,59 +1,47 @@
 import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
-import multer from 'multer';
-import { promisify } from 'util';
+import { writeFile } from 'fs/promises';
 import path from 'path';
+import { tmpdir } from 'os'; // Use the operating system's temporary directory
 
-// --- Database Connection ---
+// Database connection configuration with SSL
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  ssl: { "rejectUnauthorized": true }
+  ssl: { "rejectUnauthorized": true } // Ensures a secure connection
 };
 
-// --- Multer Configuration for File Uploads ---
-const storage = multer.diskStorage({
-  destination: './public/schoolImages',
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const upload = multer({ storage });
-const uploadMiddleware = promisify(upload.single('image'));
-
-// --- API Handler ---
+// API Handler for POST requests
 export async function POST(req) {
   try {
-    // We need to handle multipart form data
     const formData = await req.formData();
-    const body = Object.fromEntries(formData);
-    const file = formData.get('image');
+    
+    // Extract text fields
+    const name = formData.get('name');
+    const address = formData.get('address');
+    const city = formData.get('city');
+    const state = formData.get('state');
+    const contact = formData.get('contact');
+    const email_id = formData.get('email_id');
+    const imageFile = formData.get('image');
 
-    if (!file) {
+    if (!imageFile) {
       return NextResponse.json({ message: 'No image file uploaded' }, { status: 400 });
     }
 
-    // Save file to disk
-    const { createWriteStream } = require('fs');
-    const { join } = require('path');
-    const filePath = join(process.cwd(), 'public/schoolImages', file.name);
-    const writeStream = createWriteStream(filePath);
-    const reader = file.stream().getReader();
+    const buffer = Buffer.from(await imageFile.arrayBuffer());
+    const filename = `${Date.now()}-${imageFile.name.replaceAll(' ', '_')}`;
+    
+    // **THE FIX:** Write to the temporary directory, which is always writable
+    const imagePath = path.join(tmpdir(), filename);
+    await writeFile(imagePath, buffer);
 
-    while(true) {
-        const { done, value } = await reader.read();
-        if(done) break;
-        writeStream.write(value);
-    }
-    writeStream.end();
+    // This path is what we will store in the database
+    const imageUrl = `/schoolImages/${filename}`; 
 
-    const { name, address, city, state, contact, email_id } = body;
-    const imageUrl = `/schoolImages/${file.name}`; // Path to be stored in DB
-
-    // --- Insert data into MySQL ---
+    // --- Database Insertion ---
     const connection = await mysql.createConnection(dbConfig);
     const query = 'INSERT INTO schools (name, address, city, state, contact, image, email_id) VALUES (?, ?, ?, ?, ?, ?, ?)';
     const values = [name, address, city, state, contact, imageUrl, email_id];

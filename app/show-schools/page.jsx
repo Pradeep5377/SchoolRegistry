@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import Image from 'next/image'; // Use Next.js Image component for optimization
+import Image from 'next/image';
 
 // --- Database Connection ---
 const dbConfig = {
@@ -13,12 +13,13 @@ const dbConfig = {
 async function getSchools() {
     try {
         const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute('SELECT name, address, city, image FROM schools ORDER BY id DESC');
+        // FIX 1: Added 'id' to the SELECT statement
+        const [rows] = await connection.execute('SELECT id, name, address, city, image FROM schools ORDER BY id DESC');
         await connection.end();
         return rows;
     } catch (error) {
         console.error("Failed to fetch schools:", error);
-        return []; // Return empty array on error
+        return [];
     }
 }
 
@@ -38,13 +39,14 @@ export default async function ShowSchoolsPage() {
                         <div key={school.id} className="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
                             <div className="relative w-full h-48">
                                 <Image
-                                    src={school.image}
+                                    src={school.image || '/placeholder.png'} // Added a fallback image
                                     alt={`Image of ${school.name}`}
-                                    layout="fill"
-                                    objectFit="cover"
+                                    // FIX 2: Replaced deprecated props with modern ones
+                                    fill
+                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    style={{ objectFit: 'cover' }}
                                     className="bg-gray-200"
                                 />
-                                
                             </div>
                             <div className="p-4">
                                 <h2 className="text-xl font-semibold text-gray-800 mb-2 truncate">{school.name}</h2>
@@ -58,3 +60,6 @@ export default async function ShowSchoolsPage() {
         </div>
     );
 }
+
+// Optional: This tells Next.js to refetch the data periodically
+export const revalidate = 60;
