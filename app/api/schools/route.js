@@ -1,47 +1,58 @@
 import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
-import { writeFile } from 'fs/promises';
+import multer from 'multer';
+import { promisify } from 'util';
 import path from 'path';
-import { tmpdir } from 'os'; // Use the operating system's temporary directory
 
-// Database connection configuration with SSL
+// --- Database Connection ---
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  ssl: { "rejectUnauthorized": true } // Ensures a secure connection
 };
 
-// API Handler for POST requests
+// --- Multer Configuration for File Uploads ---
+const storage = multer.diskStorage({
+  destination: './public/schoolImages',
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
+const uploadMiddleware = promisify(upload.single('image'));
+
+// --- API Handler ---
 export async function POST(req) {
   try {
+    // We need to handle multipart form data
     const formData = await req.formData();
-    
-    // Extract text fields
-    const name = formData.get('name');
-    const address = formData.get('address');
-    const city = formData.get('city');
-    const state = formData.get('state');
-    const contact = formData.get('contact');
-    const email_id = formData.get('email_id');
-    const imageFile = formData.get('image');
+    const body = Object.fromEntries(formData);
+    const file = formData.get('image');
 
-    if (!imageFile) {
+    if (!file) {
       return NextResponse.json({ message: 'No image file uploaded' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
-    const filename = `${Date.now()}-${imageFile.name.replaceAll(' ', '_')}`;
-    
-    // **THE FIX:** Write to the temporary directory, which is always writable
-    const imagePath = path.join(tmpdir(), filename);
-    await writeFile(imagePath, buffer);
+    // Save file to disk
+    const { createWriteStream } = require('fs');
+    const { join } = require('path');
+    const filePath = join(process.cwd(), 'public/schoolImages', file.name);
+    const writeStream = createWriteStream(filePath);
+    const reader = file.stream().getReader();
 
-    // This path is what we will store in the database
-    const imageUrl = `/schoolImages/${filename}`; 
+    while(true) {
+        const { done, value } = await reader.read();
+        if(done) break;
+        writeStream.write(value);
+    }
+    writeStream.end();
 
-    // --- Database Insertion ---
+    const { name, address, city, state, contact, email_id } = body;
+    const imageUrl = `/schoolImages/${file.name}`; // Path to be stored in DB
+
+    // --- Insert data into MySQL ---
     const connection = await mysql.createConnection(dbConfig);
     const query = 'INSERT INTO schools (name, address, city, state, contact, image, email_id) VALUES (?, ?, ?, ?, ?, ?, ?)';
     const values = [name, address, city, state, contact, imageUrl, email_id];

@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import Image from 'next/image';
+import Image from 'next/image'; // Use Next.js Image component for optimization
 
 // --- Database Connection ---
 const dbConfig = {
@@ -7,19 +7,17 @@ const dbConfig = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
-    ssl: { "rejectUnauthorized": true }
 };
 
 async function getSchools() {
     try {
         const connection = await mysql.createConnection(dbConfig);
-        // FIX 1: Added 'id' to the SELECT statement
-        const [rows] = await connection.execute('SELECT id, name, address, city, image FROM schools ORDER BY id DESC');
+        const [rows] = await connection.execute('SELECT name, address, city, image FROM schools ORDER BY id DESC');
         await connection.end();
         return rows;
     } catch (error) {
         console.error("Failed to fetch schools:", error);
-        return [];
+        return []; 
     }
 }
 
@@ -33,20 +31,20 @@ export default async function ShowSchoolsPage() {
             
             {schools.length === 0 ? (
                 <p className="text-center text-gray-500">No schools found. Please add a school first.</p>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            ) :
+                (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
                     {schools.map((school) => (
                         <div key={school.id} className="bg-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform duration-300">
                             <div className="relative w-full h-48">
                                 <Image
-                                    src={school.image || '/placeholder.png'} // Added a fallback image
+                                    src={school.image}
                                     alt={`Image of ${school.name}`}
-                                    // FIX 2: Replaced deprecated props with modern ones
-                                    fill
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                    style={{ objectFit: 'cover' }}
+                                    layout="fill"
+                                    objectFit="cover"
                                     className="bg-gray-200"
                                 />
+                                
                             </div>
                             <div className="p-4">
                                 <h2 className="text-xl font-semibold text-gray-800 mb-2 truncate">{school.name}</h2>
@@ -60,6 +58,3 @@ export default async function ShowSchoolsPage() {
         </div>
     );
 }
-
-// Optional: This tells Next.js to refetch the data periodically
-export const revalidate = 60;
