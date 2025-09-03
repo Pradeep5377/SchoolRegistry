@@ -92,9 +92,10 @@ Follow these instructions to get a copy of the project up and running on your lo
 ## Screenshots
 
 ### Home Page
-
+![Home Page Screenshot](https://github.com/Pradeep5f377/SchoolRegistry/raw/main/screenshots/home.jpg)
 
 ### Add School Form
 ![Add School Form Screenshot](https://github.com/Pradeep5377/SchoolRegistry/raw/main/screenshots/add-school.jpg)
 
 ### Show Schools Page
+![Show Schools Page Screenshot](https://github.com/Pradeep5377/SchoolRegistry/raw/main/screenshots/show-schools.jpg)
